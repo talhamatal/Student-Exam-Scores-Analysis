@@ -1,5 +1,10 @@
 ---
 title: "Performance Analysis of Students Exam Scores"
+knit: (function(input_file, encoding) {
+    out_dir <- 'docs';
+    rmarkdown::render(input_file,
+      encoding=encoding,
+      output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 author: "Talha Matal"
 date: "8/16/2021"
 output:
