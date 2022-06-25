@@ -8,8 +8,6 @@ knit: (function(input_file, encoding) {
 author: "Talha Matal"
 date: "8/16/2021"
 output:
-  pdf_document:
-    toc: yes
   html_document:
     fig_width: 8
     code_folding: hide
