@@ -1,0 +1,556 @@
+---
+title: "Performance Analysis of Students Exam Scores"
+author: "Talha Matal"
+date: "8/16/2021"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    fig_width: 8
+    code_folding: hide
+    highlight: tango
+    toc: yes
+    toc_float:
+      collapsed: yes
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=8, fig.height=4,
+                      echo=FALSE, warning=FALSE, message=FALSE)
+```
+```{r ,echo=FALSE,message=FALSE}
+library(tidyverse)
+library(knitr)
+library(aod)
+library(pROC)
+data <- read.csv("StudentsPerformance.csv",header=TRUE)
+data.tibble <- as.tibble(data)
+```
+
+## Dataset Details
+
+The data set that I have selected for this analysis includes data for 1000 students for the exam scores for math, reading and writing sections for students belonging to 5 different ethnic groups. The data set contains the ethnic group (group A, group B, group C, group D, group E), gender (male, female), parental highest level of education completed, lunch type for the student and whether the student has taken / completed a test preparation course. 
+
+```{r,echo=TRUE}
+data.tibble
+```
+
+## Inspiration for Analysis
+
+The objective behind the analysis done in this project to analyze the performance of the students in the  exam by summarizing the data set and performing the test to compare the means for scores based on gender and test prep course completion. The analysis done within this project is done to answer the below questions.
+
+  1.	Analyze the performance of student in exam based on  gender (male/female) and perform               comparison of mean scores between male and female populations for math, reading and writing         exams.
+  2.	Analyze the performance of student in exam based on the race /ethnic group and perform              comparison of mean scores between different ethnic group population for math, reading and           writing exams.
+  3.	Analyze the performance of student in exam based on the test prep course completion and             perform comparison of mean scores between students completing and not completing test prep          course for the math, reading and writing exams.
+  4.  Create a logistic regression model to predict the level of score for each of the sections           based on the gender and test preparation course completion status.
+
+
+
+## Data Preparation
+
+The data set is loaded into a data frame in R and then I start to view the data set from the perspective of the different scenarios that I have pointed out above in the Inspiration for analysis section. But before we start the analysis we see how many scores are available based on each of the groups defined in the dataset. 
+
+The first we look in terms of the gender.
+```{r,echo=TRUE}
+kable(table(data$gender))
+```
+We can see that there are 518 male and 482 female scores available to us.
+
+
+Then we look from the perspective of ethnic groups and the data for that is shown below.
+```{r,echo=TRUE}
+kable(table(data$race.ethnicity))
+```
+
+
+Lastly we look from the perspective of test preparation course completion status. 
+```{r,echo=TRUE}
+kable(table(data$test.preparation.course))
+```
+We can see that 358 students completed where as 642 did not.
+
+The dataset contains no N/A or empty values so no further data manipulation or cleaning was required.
+```{r,echo=TRUE}
+kable(colSums(is.na(data)))
+```
+
+## Data set Distribution 
+
+In this section we look at the numerical and graphical summaries of the data for the scores of math reading and writing section of the exams and based on that we look to perform the analysis further on the data set to provide further conclusions.
+
+The summary of the data for the score for each section is shown below.
+```{r,echo=TRUE}
+kable(summary(data[,6:8]))
+```
+
+The boxplot for the data for math, reading and writing score is shown below.
+```{r,echo=TRUE}
+boxplot(data$math.score,data$reading.score,data$writing.score, 
+        main ="Boxplot for the scores for each section"
+        ,ylab= "Score",names = c("Math Score","Reading Score","Writing Score"))
+```
+
+The histogram for the three section scores for the data set is shown below.
+```{r,echo=TRUE}
+hist(data$math.score,main="Histogram of Math Score",xlab = "Math Scores",
+     probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$math.score))
+hist(data$reading.score,main="Histogram of Reading Score",xlab = "Reading Scores",
+     probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$reading.score))
+hist(data$writing.score,main="Histogram of Writing Score",xlab = "Writing Scores",
+     probability = TRUE, xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$writing.score))
+```
+
+From the histograms above we can see that the student scores for the math, reading and writing sections in the exam follow approximately a normal distribution. 
+
+
+## Analysis based on Gender
+
+In this section we analyze the data set based on the gender of the student and interested in finding out if the means of the score for each of the exam section is same or vary by the gender of the student that is in other words the data varies based on the gender or not.
+
+First we view the graphical summary of the scores based on the gender. 
+```{r,echo=TRUE}
+par(mfrow=c(2,4))
+boxplot(data$math.score[data$gender=="male"],
+        data$reading.score[data$gender=="male"],
+        data$writing.score[data$gender=="male"],
+        names = c("Math Score","Reading Score","Writing Score"),
+        main ="Male",ylab="Score")
+hist(data$math.score[data$gender=="male"],main="Male",xlab = "Math Score",
+     probability = TRUE,xlim = c(0,120),ylim = c(0,0.03),col = "blue")
+lines(density(data$math.score[data$gender=="male"]))
+hist(data$reading.score[data$gender=="male"],main="Male",xlab = "Reading Score",
+     probability = TRUE,xlim = c(0,120),ylim = c(0,0.03),col = "blue")
+lines(density(data$reading.score[data$gender=="male"]))
+hist(data$writing.score[data$gender=="male"],main="Male",xlab = "Writing Score",
+     probability = TRUE,xlim = c(0,120),ylim = c(0,0.03),col = "blue")
+lines(density(data$writing.score[data$gender=="male"]))
+
+boxplot(data$math.score[data$gender=="female"],
+        data$reading.score[data$gender=="female"],
+        data$writing.score[data$gender=="female"],
+        names = c("Math Score","Reading Score","Writing Score"),
+        main ="Female",ylab="Score")
+hist(data$math.score[data$gender=="female"],main="Female",xlab = "Math Score",
+     probability = TRUE,xlim = c(0,120),ylim = c(0,0.03),col = "red")
+lines(density(data$math.score[data$gender=="female"]))
+hist(data$reading.score[data$gender=="female"],main="Female",xlab = "Reading Score",
+     probability = TRUE,xlim = c(0,120),ylim = c(0,0.03),col = "red")
+lines(density(data$reading.score[data$gender=="female"]))
+hist(data$writing.score[data$gender=="female"],main="Female",xlab = "Writing Score",
+     probability = TRUE,xlim = c(0,120),ylim = c(0,0.03),col = "red")
+lines(density(data$writing.score[data$gender=="female"]))
+par(mfrow=c(1,1))
+```
+
+From the graphical summary we can see that the scores for each of the sections for the male and female group follow approximately normal distribution with not having a strong skewness with only a few number of outliers. So we can apply two sample test to compare for the mean of scores for each section for the male and female population groups. We will be performing a two sample t test in this case to compare the means as it is a robust process in case of non-normality of the samples if any. The results of the two sample t test is shown below. THe test is performed for 0.05 level of significance. 
+
+### Comparison of Mean of Math score 
+```{r,echo=TRUE}
+t.test(data$math.score[data$gender=="male"],data$math.score[data$gender=="female"],
+       alternative = "two.sided",conf.level = 0.95)
+```
+We can see that the value of p is lesser than the value of alpha which is 0.05 in this case so we reject the null hypothesis that the mean of the math scores between the male and female populations is equal. The mean score of math section between the male and female is different.The difference in mean was 5.095 indicating that the male students on average scored better as compared to female students in the math section of the exam.
+
+### Comparison of Mean of Reading score
+```{r,echo=TRUE}
+t.test(data$reading.score[data$gender=="male"],data$reading.score[data$gender=="female"],
+       alternative = "two.sided",conf.level = 0.95)
+```
+
+We can see that the value of p is lesser than the value of alpha which is 0.05 in this case so we reject the null hypothesis that the mean of the reading scores between the male and female populations is equal. The mean score of reading section between the male and female is different.The difference in mean was -7.13508 indicating that the female students on average scored better as compared to male students in the reading section of the exam.
+
+### Comparison of Mean of Writing score
+```{r,echo=TRUE}
+t.test(data$writing.score[data$gender=="male"],data$writing.score[data$gender=="female"],
+       alternative = "two.sided",conf.level = 0.95)
+```
+
+We can see that the value of p is lesser than the value of alpha which is 0.05 in this case so we reject the null hypothesis that the mean of the writing scores between the male and female populations is equal. The mean score of writing section between the male and female is different.The difference in mean was -9.15598 indicating that the female students on average scored better as compared to male students in the writing section of the exam.
+
+In the end we can conclude that the performance of male students is better in the maths section for the exam where as the female students perform better on the reading and writing sections of the exams considering that the other factors are kept the same for them.
+
+## Analysis based on Test Preparation Course
+
+In this section we analyze the data set based on the test prep course completion status of the student and interested in finding out if the mean of the score for each of the exam section is same or vary by the test prep course completion status of the student that is in other words the data varies based on the test prep course completion status or not.
+
+First we view the graphical summary of the scores based on the test prep course completion status.
+```{r,echo=TRUE}
+par(mfrow=c(2,4))
+boxplot(data$math.score[data$test.preparation.course=="completed"],
+        data$reading.score[data$test.preparation.course=="completed"],
+        data$writing.score[data$test.preparation.course=="completed"],
+        names = c("Math Score","Reading Score","Writing Score"),
+        main ="Test Prep Completed",ylab="Score")
+hist(data$math.score[data$test.preparation.course=="completed"],main="Test Prep Completed"
+     ,xlab = "Math Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03),col = "blue")
+lines(density(data$math.score[data$test.preparation.course=="completed"]))
+hist(data$reading.score[data$test.preparation.course=="completed"],main="Test Prep Completed"
+     ,xlab = "Reading Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03),col = "blue")
+lines(density(data$reading.score[data$test.preparation.course=="completed"]))
+hist(data$writing.score[data$test.preparation.course=="completed"],main="Test Prep Complete"
+     ,xlab = "Writing Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03),col = "blue")
+lines(density(data$writing.score[data$test.preparation.course=="completed"]))
+
+boxplot(data$math.score[data$test.preparation.course=="none"],
+        data$reading.score[data$test.preparation.course=="none"],
+        data$writing.score[data$test.preparation.course=="none"],
+        names = c("Math Score","Reading Score","Writing Score"),
+        main ="Test Prep NOT Completed",ylab="Score")
+hist(data$math.score[data$test.preparation.course=="none"],main="Test Prep NOT Completed",xlab = "Math Score",
+     probability = TRUE,xlim = c(0,120),ylim = c(0,0.03),col = "red")
+lines(density(data$math.score[data$test.preparation.course=="none"]))
+hist(data$reading.score[data$test.preparation.course=="none"],main="Test Prep NOT Completed",xlab = "Reading Score",
+     probability = TRUE,xlim = c(0,120),ylim = c(0,0.03),col = "red")
+lines(density(data$reading.score[data$test.preparation.course=="none"]))
+hist(data$writing.score[data$test.preparation.course=="none"],main="Test Prep NOT Completed",xlab = "Writing Score",
+     probability = TRUE,xlim = c(0,120),ylim = c(0,0.03),col = "red")
+lines(density(data$writing.score[data$test.preparation.course=="none"]))
+par(mfrow=c(1,1))
+```
+
+From the graphical summary we can see that the scores for each of the sections for the two groups (test prep completed and not completed) follow approximately normal distribution with not having a strong skewness with only a few number of outliers. So we can apply two sample test to compare for the mean of scores for each section for the test prep completed and not completed population groups. We will be performing a two sample t test in this case to compare the means as it is a robust process in case of non-normality of the samples if any. The results of the two sample t test is shown below. THe test is performed for 0.05 level of significance.
+
+### Comparison of Mean of Math score 
+```{r,echo=TRUE}
+t.test(data$math.score[data$test.preparation.course=="completed"],
+       data$math.score[data$test.preparation.course=="none"],
+      alternative = "two.sided",conf.level = 0.95)
+```
+We can see that the value of p (1.043e-08) is lesser than the value of alpha which is 0.05 in this case so we reject the null hypothesis that the mean of the math scores between the test prep course completion and non completion populations is equal. The mean score of math section between the test prep course completion and non completion populations is different.The difference in mean was 5.61765 indicating that the students who have completed the test prep course on average scored better as compared to the students who have not completed the test prep course in the maths section of the exam.
+
+### Comparison of Mean of Reading score
+```{r,echo=TRUE}
+t.test(data$reading.score[data$test.preparation.course=="completed"],
+       data$reading.score[data$test.preparation.course=="none"],
+       alternative = "two.sided",conf.level = 0.95)
+```
+
+We can see that the value of p (4.389e-15) is lesser than the value of alpha which is 0.05 in this case so we reject the null hypothesis that the mean of the reading scores between the test prep course completion and non completion populations is equal. The mean score of reading section between test prep course completion and non completion populations is different. The difference in mean was 7.35958 indicating that the students who have completed the test prep course on average scored better as compared to the students who have not completed the test prep course in the reading section of the exam.
+
+### Comparison of Mean of Writing score
+```{r,echo=TRUE}
+t.test(data$writing.score[data$test.preparation.course=="completed"],
+       data$writing.score[data$test.preparation.course=="none"],
+       alternative = "two.sided",conf.level = 0.95)
+```
+
+We can see that the value of p (p-value < 2.2e-16) is lesser than the value of alpha which is 0.05 in this case so we reject the null hypothesis that the mean of the writing scores between the test prep course completion and non completion populations is equal. The mean score of writing section between the test prep course completion and non completion populations is different.The difference in mean was 9.91432 indicating that the students who have completed the test prep course on average scored better as compared to the students who have not completed the test prep course in the writing section of the exam.
+
+In the end we can conclude that the performance of the students who have completed the test preparation course is better in all the three sections for the exam considering that the other factors are kept the same for them. And the performance on the reading and writing sections improved more for the students who have completed the course as opposing to the ones who have not completed.
+
+## Analysis based on Race/Ethnic Group
+
+In this section we analyze the data set based on the race/ ethnic group of the student and interested in finding out if the mean of the score for each of the exam section is same or vary by the race /ethnic group of the student that is in other words the data varies based on the race /ethnic group or not.
+
+First we view the graphical summary of the scores based on the ethnic group.
+```{r,echo=TRUE}
+par(mfrow=c(1,4))
+boxplot(data$math.score[data$race.ethnicity=="group A"],
+        data$reading.score[data$race.ethnicity=="group A"],
+        data$writing.score[data$race.ethnicity=="group A"],
+        names = c("Math Score","Reading Score","Writing Score"),
+        main ="Ethnic Group A",ylab="Score")
+hist(data$math.score[data$race.ethnicity=="group A"],main="Ethnic Group A"
+     ,xlab = "Math Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$math.score[data$race.ethnicity=="group A"]))
+hist(data$reading.score[data$race.ethnicity=="group A"],main="Ethnic Group A"
+     ,xlab = "Reading Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$reading.score[data$race.ethnicity=="group A"]))
+hist(data$writing.score[data$race.ethnicity=="group A"],main="Ethnic Group A"
+     ,xlab = "Writing Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$writing.score[data$race.ethnicity=="group A"]))
+
+boxplot(data$math.score[data$race.ethnicity=="group B"],
+        data$reading.score[data$race.ethnicity=="group B"],
+        data$writing.score[data$race.ethnicity=="group B"],
+        names = c("Math Score","Reading Score","Writing Score"),
+        main ="Ethnic Group B",ylab="Score")
+hist(data$math.score[data$race.ethnicity=="group B"],main="Ethnic Group B"
+     ,xlab = "Math Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$math.score[data$race.ethnicity=="group B"]))
+hist(data$reading.score[data$race.ethnicity=="group B"],main="Ethnic Group B"
+     ,xlab = "Reading Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$reading.score[data$race.ethnicity=="group B"]))
+hist(data$writing.score[data$race.ethnicity=="group B"],main="Ethnic Group B"
+     ,xlab = "Writing Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$writing.score[data$race.ethnicity=="group B"]))
+
+boxplot(data$math.score[data$race.ethnicity=="group C"],
+        data$reading.score[data$race.ethnicity=="group C"],
+        data$writing.score[data$race.ethnicity=="group C"],
+        names = c("Math Score","Reading Score","Writing Score"),
+        main ="Ethnic Group C",ylab="Score")
+hist(data$math.score[data$race.ethnicity=="group C"],main="Ethnic Group C"
+     ,xlab = "Math Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$math.score[data$race.ethnicity=="group C"]))
+hist(data$reading.score[data$race.ethnicity=="group C"],main="Ethnic Group C"
+     ,xlab = "Reading Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$reading.score[data$race.ethnicity=="group C"]))
+hist(data$writing.score[data$race.ethnicity=="group C"],main="Ethnic Group C"
+     ,xlab = "Writing Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$writing.score[data$race.ethnicity=="group C"]))
+
+
+boxplot(data$math.score[data$race.ethnicity=="group D"],
+        data$reading.score[data$race.ethnicity=="group D"],
+        data$writing.score[data$race.ethnicity=="group D"],
+        names = c("Math Score","Reading Score","Writing Score"),
+        main ="Ethnic Group D",ylab="Score")
+hist(data$math.score[data$race.ethnicity=="group D"],main="Ethnic Group D"
+     ,xlab = "Math Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$math.score[data$race.ethnicity=="group D"]))
+hist(data$reading.score[data$race.ethnicity=="group D"],main="Ethnic Group D"
+     ,xlab = "Reading Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$reading.score[data$race.ethnicity=="group D"]))
+hist(data$writing.score[data$race.ethnicity=="group D"],main="Ethnic Group D"
+     ,xlab = "Writing Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$writing.score[data$race.ethnicity=="group D"]))
+
+
+boxplot(data$math.score[data$race.ethnicity=="group E"],
+        data$reading.score[data$race.ethnicity=="group E"],
+        data$writing.score[data$race.ethnicity=="group E"],
+        names = c("Math Score","Reading Score","Writing Score"),
+        main ="Ethnic Group E",ylab="Score")
+hist(data$math.score[data$race.ethnicity=="group E"],main="Ethnic Group E"
+     ,xlab = "Math Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$math.score[data$race.ethnicity=="group E"]))
+hist(data$reading.score[data$race.ethnicity=="group E"],main="Ethnic Group E"
+     ,xlab = "Reading Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$reading.score[data$race.ethnicity=="group E"]))
+hist(data$writing.score[data$race.ethnicity=="group E"],main="Ethnic Group E"
+     ,xlab = "Writing Score",probability = TRUE,xlim = c(0,120),ylim = c(0,0.03))
+lines(density(data$writing.score[data$race.ethnicity=="group E"]))
+par(mfrow=c(1,1))
+```
+
+From the graphical summary we can see that the scores for each of the sections for the 5 ethnic groups follow approximately normal distribution with not having a strong skewness with only a few number of outliers. As we have 5 different groups so we cannot apply the two sample mean so we need to do the one way ANOVA to compare the means across the ethnic groups. The results of the ANOVA analysis is shown below. The analysis is performed for 0.05 level of significance.
+
+### Comparison of Mean of Math score 
+```{r,echo=TRUE}
+is.factor(data$race.ethnicity)
+data$race.ethnicity <- as.factor(data$race.ethnicity)
+m.math <- aov(data$math.score~data$race.ethnicity)
+summary(m.math)
+```
+We can see that the value of p (1.37e-11) is lesser than the value of alpha which is 0.05 in this case so we reject the null hypothesis that the mean of the math scores between the different race / ethnic group populations is equal. The mean score of math section between the race/ethnic group populations is different.
+
+To see which groups have different means we do the pairwise comparison using the tukey adjustment to test which groups are significant in causing the difference in the mean between the groups. 
+```{r,echo=TRUE}
+TukeyHSD(m.math)
+```
+We can see from the output that the group A and group E,group B and group E, group C and group E have significant differences in the mean math scores with the p values almost close to 0 and difference in mean higher than 8.
+
+### Comparison of Mean of Reading score
+```{r,echo=TRUE}
+m.reading <- aov(data$reading.score~data$race.ethnicity)
+summary(m.reading)
+```
+We can see that the value of p (0.000178) is lesser than the value of alpha which is 0.05 in this case so we reject the null hypothesis that the mean of the reading scores between the different race / ethnic group populations is equal. The mean score of reading section between the race/ethnic group populations is different.
+
+To see which groups have different means we do the pairwise comparison using the tukey adjustment to test which groups are significant in causing the difference in the mean between the groups. 
+```{r,echo=TRUE}
+TukeyHSD(m.reading)
+```
+We can see from the output that the group A and group E,group B and group E, group A and group D have significant differences in the mean reading scores with the p values lower than the alpha value of 0.05 and difference in mean higher than 5.
+
+### Comparison of Mean of Writing score
+
+```{r,echo=TRUE}
+m.writing <- aov(data$writing.score~data$race.ethnicity)
+summary(m.writing)
+```
+We can see that the value of p (1.1e-05) is lesser than the value of alpha which is 0.05 in this case so we reject the null hypothesis that the mean of the writing scores between the different race / ethnic group populations is equal. The mean score of writing section between the race/ethnic group populations is different.
+
+To see which groups have different means we do the pairwise comparison using the tukey adjustment to test which groups are significant in causing the difference in the mean between the groups. 
+```{r,echo=TRUE}
+TukeyHSD(m.writing)
+```
+We can see from the output that the group A and group c, group A and group D, group A and group E, group B and group E have significant differences in the mean writing scores with the p values lower than the alpha value of 0.05 and difference in mean higher than 5.
+
+## Two Way ANOVA for Gender and Race/ethnicity Group
+
+In this section I analyze the data for the comparison of means across the groups based on two factors gender (male/female) and the ethnic group the students belong to. In this we try to analyze the effect of either of the variable on the mean score in the different section of the exams after controlling for the other factor. 
+
+But before we can conduct the two way ANCOVA test to compare the means we need to perform the test of interaction to understand if there is a non additive effect of either variable on the response. 
+So we perform the interaction test for the gender and the race/ ethnic group for the scores to see if we can perform two-away ANOVA or not.
+
+### Interaction Test for the Math Score
+```{r,echo=TRUE}
+model <- lm(data$math.score~data$race.ethnicity+data$gender+data$race.ethnicity*data$gender)
+summary (model)
+interaction.plot(data$race.ethnicity,data$gender,data$math.score,col = 1:2)
+```
+
+We can see that the p value(9.498e-15) of the interaction test is lesser than the regular value of alpha 0.05 so we can conclude that there is significant interaction between the two factors gender and race/ethnic group so we cannot perform two-away ANOVA analysis but will need to perform two one away ANOVA analysis for this stratified for either gender or by the race/ ethnic group.
+
+### Interaction Test for the Reading Score
+```{r,echo=TRUE}
+model <- lm(data$reading.score~data$race.ethnicity+data$gender+data$race.ethnicity*data$gender)
+summary (model)
+interaction.plot(data$race.ethnicity,data$gender,data$reading.score,col = 1:2)
+```
+
+We can see that the p value(1.383e-14) of the interaction test is lesser than the regular value of alpha 0.05 so we can conclude that there is significant interaction between the two factors gender and race/ethnic group so we cannot perform two-away ANOVA analysis but will need to perform two one away ANOVA analysis for this stratified for either gender or by the race/ ethnic group.
+
+### Interaction Test for the Writing Score
+```{r,echo=TRUE}
+model <- lm(data$writing.score~data$race.ethnicity+data$gender+data$race.ethnicity*data$gender)
+summary (model)
+interaction.plot(data$race.ethnicity,data$gender,data$writing.score,col = 1:2)
+```
+
+We can see that the p value(p-value: < 2.2e-16) of the interaction test is lesser than the regular value of alpha 0.05 so we can conclude that there is significant interaction between the two factors gender and race/ethnic group so we cannot perform two-away ANOVA analysis but will need to perform two one away ANOVA analysis for this stratified for either gender or by the race/ ethnic group.
+
+### Stratified One-Way ANOVA 
+
+Based on the interaction tests above the two way ANOVA will not be the most appropriate analysis for this data so we need to perform stratified one way ANOVA for this dataset based on either gender or by race/ethnic group. For my purpose I have done the analysis based on the gender. 
+
+#### Stratified One-way ANOVA based on Gender
+```{r,echo=TRUE}
+male <- data[data$gender =="male",]
+summary(aov(male$math.score~male$race.ethnicity))
+```
+From the above analysis we can see that the p value (7.67e-07) of the F test for the one way ANOVA is lesser than the default value of alpha which is 0.05 so there is significant evidence that the mean score in the math section of the exam for males is different across the race/ethnic groups.
+
+```{r,echo=TRUE}
+summary(aov(male$reading.score~male$race.ethnicity))
+```
+From the above analysis we can see that the p value (0.00325) of the F test for the one way ANOVA is lesser than the default value of alpha which is 0.05 so there is significant evidence that the mean score in the reading section of the exam for males is different across the race/ethnic groups.
+
+```{r,echo=TRUE}
+summary(aov(male$writing.score~male$race.ethnicity))
+```
+From the above analysis we can see that the p value (0.00118) of the F test for the one way ANOVA is lesser than the default value of alpha which is 0.05 so there is significant evidence that the mean score in the writing section of the exam for males is different across the race/ethnic groups.
+
+```{r,echo=TRUE}
+female <- data[data$gender =="female",]
+summary(aov(female$math.score~female$race.ethnicity))
+```
+From the above analysis we can see that the p value (5.94e-05) of the F test for the one way ANOVA is lesser than the default value of alpha which is 0.05 so there is significant evidence that the mean score in the math section of the exam for females is different across the race/ethnic groups.
+
+```{r,echo=TRUE}
+summary(aov(female$reading.score~female$race.ethnicity))
+```
+From the above analysis we can see that the p value (0.071) of the F test for the one way ANOVA is greater than the default value of alpha which is 0.05 so there is no significant evidence that the mean score in the reading section of the exam for females is different across the race/ethnic groups. we can say that based on the current data set we dont have the evidence that the mean score in the reading section across the different ethnic groups in females is different.
+
+```{r,echo=TRUE}
+summary(aov(female$writing.score~female$race.ethnicity))
+```
+From the above analysis we can see that the p value (0.00912) of the F test for the one way ANOVA is lesser than the default value of alpha which is 0.05 so there is significant evidence that the mean score in the writing section of the exam for females is different across the race/ethnic groups.
+
+## Logistic Regression Model for Prediction of Scores for Each Section of Exam
+
+I define a logistic regression model to predict the scores for each section of the exam (math, reading, writing). For this model I am selecting the gender and the test preparation course status as my explanatory variables to find if the score for particular student is higher than a threshold value (70 in my case). For this I first define the dummy variables for the score for the math, reading and writing scores where 0 is the value for the score of lesser than 70 and 1 for the score of greater than and equal to 70. For the gender we define the males as 1 and females as 2. For the test preparation course status I define the 0 as none and 1 as completed. 
+
+```{r,echo=TRUE}
+data$math.level <- ifelse(data$math.score>=70,1,0)
+data$reading.level <- ifelse(data$reading.score>=70,1,0)
+data$writing.level <- ifelse(data$writing.score>=70,1,0)
+data$gender.level <- ifelse(data$gender =="male",1,2)
+data$test.preparation.course.level <- ifelse(data$test.preparation.course == "completed",1,0)
+```
+
+After defining the dummy variables I create the Multiple logistic regression model between natural logarithm (ln) of the odds of scoring higher than 70 in a section (math, reading and writing) of exam and the gender and test preparation course status. 
+
+### Logistic Regression Model for High Math Score
+
+The model for the score for the math is shown below.
+```{r,echo=TRUE}
+mlm.math <- glm(data$math.level~data$gender.level+data$test.preparation.course.level,family="binomial")
+wald.test(b=coef(mlm.math),Sigma = vcov(mlm.math), Terms = 2:3)
+summary(mlm.math)
+```
+
+The wald test p value (4.9e-08) shows that there is significant evidence of atleast one beta coefficient not equal to zero.
+
+The summary output clearly shows that the p value for both the explanatory variables the gender and the test prep course status are below the significant level of alpha of 0.05 so there is evidence of an association between the math score level and the gender or the test prep course status if the other variables are controlled.
+
+We can see that the regression coefficients for this model are -0.5702 and 0.5361 for gender and test prep course respectively. Using these values we can find the odds ratio for securing higher math score (greater than 70) between the females and males and between those with and without completed test prep course. 
+
+```{r,echo=TRUE}
+exp(coef(mlm.math))
+```
+
+We can see that the odds ratio for the gender (between female and male) is 0.5654 so male students have the better odds of scoring higher in the math section than the female students. From the above output we can see that the odds ration for the test prep course status is 1.709248 which means that the students who have completed the test prep course have the better odds of scoring higher in the math section than the students without and the odds is 1.7092482 times higher.
+
+To measure the goodness of fit of this model we find the c statistics for this model and also plot the ROC curve as shown below.
+
+```{r,echo=TRUE}
+roc.mlm.math <- roc(data$math.level~predict(mlm.math, type=c("response")))
+print(roc.mlm.math)
+plot(1-roc.mlm.math$specificities , roc.mlm.math$sensitivities , type="l", 
+     xlab="1-specificity", ylab="Sensitivity", main="ROC curve")
+abline(a=0,b=1)
+```
+
+As the area under the curve is 0.6001 so this model is not a very good fit for the data or there is around 60% chance that the model will predict the level of math score correctly.
+
+### Logistic Regression Model for High Reading Score
+
+The model for the score for the reading is shown below.
+```{r,echo=TRUE}
+mlm.reading <- glm(data$reading.level~data$gender.level+data$test.preparation.course.level,family="binomial")
+wald.test(b=coef(mlm.reading),Sigma = vcov(mlm.reading), Terms = 2:3)
+summary(mlm.reading)
+```
+The wald test p value (0.0) shows that there is significant evidence of atleast one beta coefficient not equal to zero.
+
+The summary output clearly shows that the p value for both the explanatory variables the gender and the test prep course status are below the significant level of alpha of 0.05 so there is evidence of an association between the reading score level and the gender or the test prep course status if the other variables are controlled.
+
+We can see that the regression coefficients for this model are 0.8991 and 0.949 for gender and test course prep course respectively. Using these values we can find the odds ratio for securing higher reading score (greater than 70) between the females and males and between those with and without completed test prep course. 
+
+```{r,echo=TRUE}
+exp(coef(mlm.reading))
+```
+
+We can see that the odds ratio for the gender (between female and male) is 2.4578 so female students have 2.4578 times higher odds of scoring higher in the reading section than the male students. From the above output we can see that the odds ratio for the test prep course status is 2.58302 which means that the students who have completed the test prep course have 2.58302 times higher odds of scoring higher in the reading section than the students without.
+
+To measure the goodness of fit of this model we find the c statistics for this model and also plot the ROC curve as shown below.
+
+```{r,echo=TRUE}
+roc.mlm.reading <- roc(data$reading.level~predict(mlm.reading, type=c("response")))
+print(roc.mlm.reading)
+plot(1-roc.mlm.reading$specificities , roc.mlm.reading$sensitivities , type="l", 
+     xlab="1-specificity", ylab="Sensitivity", main="ROC curve")
+abline(a=0,b=1)
+```
+
+As the area under the curve is 0.6565 so this model is not a very good fit for the data or there is around 65% chance that the model will predict the level of reading score correctly.
+
+### Logistic Regression Model for High Writing Score
+
+The model for the score for the writing is shown below.
+```{r,echo=TRUE}
+mlm.writing <- glm(data$writing.level~data$gender.level+data$test.preparation.course.level,family="binomial")
+wald.test(b=coef(mlm.writing),Sigma = vcov(mlm.writing), Terms = 2:3)
+summary(mlm.writing)
+```
+
+The wald test p value (0.0) shows that there is significant evidence of atleast one beta coefficient not equal to zero.
+
+The output clearly shows that the p value for both the explanatory variables the gender and the test prep course status are below the significant level of alpha of 0.05 so there is evidence of an association between the writing score level and the gender or the test prep course status if the other variables are controlled.
+
+We can see that the regression coefficients for this model are 1.2964 and 1.2548 for gender and test course prep course respectively. Using these values we can find the odds ratio for securing higher writing score (greater than 70) between the females and males and between those with and without completed test prep course. 
+
+```{r,echo=TRUE}
+exp(coef(mlm.writing))
+```
+
+We can see that the odds ratio for the gender (between female and male) is 3.656 so female students have 3.656 times higher odds of scoring higher in the writing section than the male students. From the above output we can see that the odds ratio for the test prep course status is 3.507 which means that the students who have completed the test prep course have 3.507 times higher odds of scoring higher in the writing section than the students without.
+
+To measure the goodness of fit of this model we find the c statistics for this model and also plot the ROC curve as shown below.
+
+```{r,echo=TRUE}
+roc.mlm.writing <- roc(data$writing.level~predict(mlm.writing, type=c("response")))
+print(roc.mlm.writing)
+plot(1-roc.mlm.writing$specificities , roc.mlm.writing$sensitivities , type="l", 
+     xlab="1-specificity", ylab="Sensitivity", main="ROC curve")
+abline(a=0,b=1)
+```
+
+As the area under the curve is 0.7071 so this model is an acceptable fit for the data or there is around 70% chance that the model will predict the level of writing score correctly.
